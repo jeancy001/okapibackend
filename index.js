@@ -5,6 +5,7 @@ import cookieParser from "cookie-parser";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import { connectDB } from "./config/db.js";
+import { startKeepAlive } from "./config/keepAlive.js";
 
 // Routers
 import { userRouter } from "./routes/user.js";
@@ -14,6 +15,8 @@ import { videoRouter } from "./routes/videoCall.js";
 
 dotenv.config();
 connectDB();
+//Restart all services
+startKeepAlive()
 
 const app = express();
 app.use(cors({ origin: "http://localhost:5173", credentials: true }));
