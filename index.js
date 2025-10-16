@@ -34,7 +34,7 @@ app.get("/", (req, res) => res.send("📡 Classroom API Running Successfully"));
 // ⚡ Setup Socket Server
 const server = createServer(app);
 const io = new Server(server, {
-  cors: { origin: "http://localhost:5173", credentials: true },
+  cors: { origin: "https://okapijunioracademia.netlify.app", credentials: true },
 });
 
 // 🎥 Video/Meeting Room Management
