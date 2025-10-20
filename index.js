@@ -18,7 +18,20 @@ connectDB();
 startKeepAlive();
 
 const app = express();
-app.use(cors({ origin: "*", credentials: true }));
+
+// ✅ Allow only your frontend origin (no wildcard)
+// const allowedOrigins = [
+//   "https://okapijunioracademia.netlify.app", // Your frontend
+//   "http://localhost:5173", // For local development
+// ];
+
+app.use(
+  cors({
+    origin:"https://okapijunioracademia.netlify.app",
+    credentials: true, // Allow cookies and authentication headers
+  })
+);
+
 app.use(express.json());
 app.use(cookieParser());
 
@@ -30,19 +43,22 @@ app.use("/api/videos", videoRouter);
 
 app.get("/", (req, res) => res.send("📡 Classroom API Running Successfully"));
 
-// ⚡ Setup Socket Server
+// ⚡ Socket.IO Server
 const server = createServer(app);
+
 const io = new Server(server, {
-  cors: { origin: "*", credentials: true },
+  cors: {
+    origin:['https://okapijunioracademia.netlify.app'],
+    credentials: true,
+  },
 });
 
-// 🎥 Video/Meeting Room Management
+// 🎥 Classroom management
 const rooms = {}; // { roomCode: [{ socketId, userName, userId, role }] }
 
 io.on("connection", (socket) => {
   console.log("🟢 User connected:", socket.id);
 
-  // Join classroom
   socket.on("join-classroom", ({ roomCode, userName, userId, role }) => {
     socket.join(roomCode);
 
@@ -51,11 +67,9 @@ io.on("connection", (socket) => {
 
     console.log(`👋 ${userName} (${role}) joined room ${roomCode}`);
 
-    // Send existing participants (excluding the new user)
     const otherUsers = rooms[roomCode].filter((u) => u.socketId !== socket.id);
     socket.emit("all-users", otherUsers);
 
-    // Notify others about the new participant
     socket.to(roomCode).emit("user-joined", {
       socketId: socket.id,
       userName,
@@ -64,7 +78,7 @@ io.on("connection", (socket) => {
     });
   });
 
-  // 📞 WebRTC Signaling Events
+  // WebRTC Signaling
   socket.on("offer", ({ target, offer, role, trackType }) => {
     io.to(target).emit("offer", { offer, sender: socket.id, role, trackType });
   });
@@ -77,7 +91,7 @@ io.on("connection", (socket) => {
     io.to(target).emit("ice-candidate", { candidate, sender: socket.id });
   });
 
-  // 🎥 Screen sharing events
+  // Screen share
   socket.on("screen-share-start", ({ roomCode }) => {
     socket.to(roomCode).emit("teacher-shared-screen", { socketId: socket.id });
   });
@@ -86,22 +100,22 @@ io.on("connection", (socket) => {
     socket.to(roomCode).emit("teacher-stopped-screen", { socketId: socket.id });
   });
 
-  // 🎤 Toggle media status (video/audio)
+  // Media toggles
   socket.on("toggle-media", ({ roomCode, userId, mediaType, status }) => {
     socket.to(roomCode).emit("media-toggled", { userId, mediaType, status });
   });
 
-  // 🚪 Handle user leaving a room
+  // Leaving
   socket.on("leave-room", ({ roomCode, userId }) => {
     if (rooms[roomCode]) {
-      rooms[roomCode] = rooms[roomCode].filter((user) => user.socketId !== socket.id);
+      rooms[roomCode] = rooms[roomCode].filter((u) => u.socketId !== socket.id);
       socket.to(roomCode).emit("user-left", { userId, socketId: socket.id });
       console.log(`🚪 ${userId} left room ${roomCode}`);
       if (rooms[roomCode].length === 0) delete rooms[roomCode];
     }
   });
 
-  // ❌ Handle disconnects
+  // Disconnect
   socket.on("disconnect", () => {
     console.log("🔴 Disconnected:", socket.id);
     for (const roomCode in rooms) {
@@ -120,4 +134,4 @@ io.on("connection", (socket) => {
 
 // 🚀 Start server
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => console.log(`✅ Server running on http://localhost:${PORT}`));
+server.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
