@@ -18,7 +18,7 @@ connectDB();
 startKeepAlive();
 
 const app = express();
-app.use(cors({ origin: "hhttps://okapijunioracademia.netlify.app", credentials: true }));
+app.use(cors({ origin: "https://okapijunioracademia.netlify.app", credentials: true }));
 app.use(express.json());
 app.use(cookieParser());
 
