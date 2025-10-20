@@ -15,11 +15,10 @@ import { videoRouter } from "./routes/videoCall.js";
 
 dotenv.config();
 connectDB();
-//Restart all services
-startKeepAlive()
+startKeepAlive();
 
 const app = express();
-app.use(cors({ origin: "https://okapijunioracademia.netlify.app", credentials: true }));
+app.use(cors({ origin: "hhttps://okapijunioracademia.netlify.app", credentials: true }));
 app.use(express.json());
 app.use(cookieParser());
 
@@ -38,24 +37,22 @@ const io = new Server(server, {
 });
 
 // 🎥 Video/Meeting Room Management
-const rooms = {}; // { roomCode: [socketIds] }
+const rooms = {}; // { roomCode: [{ socketId, userName, userId, role }] }
 
 io.on("connection", (socket) => {
   console.log("🟢 User connected:", socket.id);
 
   // Join classroom
-  socket.on("join-classroom", ({ roomCode, userName, userId }) => {
+  socket.on("join-classroom", ({ roomCode, userName, userId, role }) => {
     socket.join(roomCode);
 
     if (!rooms[roomCode]) rooms[roomCode] = [];
-    rooms[roomCode].push({ socketId: socket.id, userName, userId });
+    rooms[roomCode].push({ socketId: socket.id, userName, userId, role });
 
-    console.log(`👋 ${userName} joined room ${roomCode}`);
+    console.log(`👋 ${userName} (${role}) joined room ${roomCode}`);
 
     // Send existing participants (excluding the new user)
-    const otherUsers = rooms[roomCode].filter(
-      (user) => user.socketId !== socket.id
-    );
+    const otherUsers = rooms[roomCode].filter((u) => u.socketId !== socket.id);
     socket.emit("all-users", otherUsers);
 
     // Notify others about the new participant
@@ -63,37 +60,41 @@ io.on("connection", (socket) => {
       socketId: socket.id,
       userName,
       userId,
+      role,
     });
   });
 
   // 📞 WebRTC Signaling Events
-  socket.on("offer", ({ target, offer }) => {
-    io.to(target).emit("offer", { offer, sender: socket.id });
+  socket.on("offer", ({ target, offer, role, trackType }) => {
+    io.to(target).emit("offer", { offer, sender: socket.id, role, trackType });
   });
 
-  socket.on("answer", ({ target, answer }) => {
-    io.to(target).emit("answer", { answer, sender: socket.id });
+  socket.on("answer", ({ target, answer, role, trackType }) => {
+    io.to(target).emit("answer", { answer, sender: socket.id, role, trackType });
   });
 
   socket.on("ice-candidate", ({ target, candidate }) => {
     io.to(target).emit("ice-candidate", { candidate, sender: socket.id });
   });
 
+  // 🎥 Screen sharing events
+  socket.on("screen-share-start", ({ roomCode }) => {
+    socket.to(roomCode).emit("teacher-shared-screen", { socketId: socket.id });
+  });
+
+  socket.on("screen-share-stop", ({ roomCode }) => {
+    socket.to(roomCode).emit("teacher-stopped-screen", { socketId: socket.id });
+  });
+
   // 🎤 Toggle media status (video/audio)
   socket.on("toggle-media", ({ roomCode, userId, mediaType, status }) => {
-    socket.to(roomCode).emit("media-toggled", {
-      userId,
-      mediaType,
-      status,
-    });
+    socket.to(roomCode).emit("media-toggled", { userId, mediaType, status });
   });
 
   // 🚪 Handle user leaving a room
   socket.on("leave-room", ({ roomCode, userId }) => {
     if (rooms[roomCode]) {
-      rooms[roomCode] = rooms[roomCode].filter(
-        (user) => user.socketId !== socket.id
-      );
+      rooms[roomCode] = rooms[roomCode].filter((user) => user.socketId !== socket.id);
       socket.to(roomCode).emit("user-left", { userId, socketId: socket.id });
       console.log(`🚪 ${userId} left room ${roomCode}`);
       if (rooms[roomCode].length === 0) delete rooms[roomCode];
@@ -106,9 +107,7 @@ io.on("connection", (socket) => {
     for (const roomCode in rooms) {
       const user = rooms[roomCode].find((u) => u.socketId === socket.id);
       if (user) {
-        rooms[roomCode] = rooms[roomCode].filter(
-          (u) => u.socketId !== socket.id
-        );
+        rooms[roomCode] = rooms[roomCode].filter((u) => u.socketId !== socket.id);
         socket.to(roomCode).emit("user-left", {
           userId: user.userId,
           socketId: socket.id,
@@ -121,6 +120,4 @@ io.on("connection", (socket) => {
 
 // 🚀 Start server
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () =>
-  console.log(`✅ Server running on http://localhost:${PORT}`)
-);
+server.listen(PORT, () => console.log(`✅ Server running on http://localhost:${PORT}`));
