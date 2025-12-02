@@ -1,7 +1,16 @@
-POST  https://okapibackend.onrender.com/api/auth/login
+POST  http://localhost:5000/api/auth/login
 Content-Type: application/json
 
 {
     "email":"jeancympoy24@gmail.com",
+    "password":"0000"
+}
+###
+
+POST  https://okapibackend.onrender.com/api/auth/register
+Content-Type: application/json
+
+{   "username":"Johne",
+    "email":"trainingtech84@gmail.com",
     "password":"0000"
 }

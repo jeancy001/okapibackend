@@ -19,12 +19,7 @@ export const protect = (req, res, next) => {
 
     // 🔹 Verify JWT token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    if (!decoded) {
-      return res.status(403).json({ success: false, message: "Invalid token" });
-    }
-
-    // 🔹 Attach user data to request
-    req.user = decoded;
+    req.user = decoded; // attach user info to request
     next();
   } catch (err) {
     console.error("❌ Auth middleware error:", err.message);
@@ -38,9 +33,10 @@ export const protect = (req, res, next) => {
  */
 export const authSocket = (socket, next) => {
   try {
-    // 🔹 Extract token from socket handshake
+    // 🔹 Extract token from socket handshake (auth or headers)
     const token =
-      socket.handshake.auth?.token || socket.handshake.headers?.authorization;
+      socket.handshake.auth?.token ||
+      socket.handshake.headers?.authorization;
 
     if (!token) {
       console.log("❌ No token provided for socket connection");
@@ -48,18 +44,14 @@ export const authSocket = (socket, next) => {
     }
 
     // 🔹 Remove "Bearer " prefix if present
-    const actualToken = token.startsWith("Bearer ") ? token.split(" ")[1] : token;
+    const actualToken = token.startsWith("Bearer ")
+      ? token.split(" ")[1]
+      : token;
 
     // 🔹 Verify JWT
     const decoded = jwt.verify(actualToken, process.env.JWT_SECRET);
-    if (!decoded) {
-      return next(new Error("Authentication error: Invalid token"));
-    }
-
-    // 🔹 Attach decoded user info to socket instance
-    socket.user = decoded;
-    console.log(`✅ Authenticated socket connection: ${decoded.username || decoded.email}`);
-
+    socket.user = decoded; // attach user info to socket
+    console.log(`✅ Authenticated socket: ${decoded.username || decoded.email}`);
     next();
   } catch (err) {
     console.log("❌ Socket authentication failed:", err.message);
